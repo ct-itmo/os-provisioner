@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import tempfile
 from typing import Any
 
@@ -6,7 +7,7 @@ import httpx
 
 from quirck.auth.oauth import StaticOAuthConfiguration, OAuthClient
 
-from osp.config import GITHUB_BOT_TOKEN, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET
+from osp.config import GITHUB_BOT_TOKEN, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_WEBHOOK_SECRET
 
 
 BASE_URL = "https://api.github.com"
@@ -165,6 +166,36 @@ async def protect_branch(owner: str, repo: str, branch: str) -> None:
     response.raise_for_status()
 
 
+async def user_in_team(org: str, team_name: str, username: str) -> bool:
+    response = await api_client.get(
+        f"{BASE_URL}/orgs/{org}/teams/{team_name}/memberships/{username}",
+        headers={
+            "Authorization": f"token {GITHUB_BOT_TOKEN}"
+        }
+    )
+
+    if response.status_code == 404:
+        return False
+    
+    response.raise_for_status()
+
+    return response.json()["state"] == "active"
+
+
+async def close_pr(owner: str, repo: str, pr_number: int) -> None:
+    response = await api_client.patch(
+        f"{BASE_URL}/repos/{owner}/{repo}/pulls/{pr_number}",
+        headers={
+            "Authorization": f"token {GITHUB_BOT_TOKEN}"
+        },
+        json={
+            "state": "closed"
+        }
+    )
+
+    response.raise_for_status()
+
+
 async def clone_repo(owner: str, source_repo: str, target_repo: str) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         process = await asyncio.create_subprocess_exec(
@@ -215,7 +246,30 @@ async def clone_repo(owner: str, source_repo: str, target_repo: str) -> None:
             raise CloneError(f"git push failed with code {process.returncode}")
 
 
-__all__ = ["github_configuration", "github_client",
-           "GithubError" , "RepoExistsError", "AccountRestrictedError",
-           "get_user_login", "create_repository", "add_team", "add_collaborator",
-           "accept_invitation", "protect_branch", "clone_repo"]
+SIGNATURE_256_PREFIX = "sha256="
+
+
+def verify_signature(data: bytes, signature: str | None) -> bool:
+    if signature is None or not signature.startswith(SIGNATURE_256_PREFIX):
+        return False
+
+    signature_hex = signature[len(SIGNATURE_256_PREFIX):]
+
+    return hmac.compare_digest(
+        signature_hex,
+        hmac.new(
+            str(GITHUB_WEBHOOK_SECRET).encode(),
+            data,
+            "sha256"
+        ).hexdigest()
+    )
+
+
+__all__ = [
+    "github_configuration", "github_client",
+    "GithubError" , "RepoExistsError", "AccountRestrictedError",
+    "get_user_login", "create_repository", "add_team", "add_collaborator",
+    "accept_invitation", "protect_branch", "user_in_team", "close_pr",
+    "clone_repo",
+    "verify_signature"
+]

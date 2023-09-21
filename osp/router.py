@@ -1,15 +1,16 @@
+import datetime
 import logging
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import contains_eager, joinedload
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
 
 from quirck.auth.middleware import AdminMiddleware, AuthenticationMiddleware
@@ -60,7 +61,7 @@ async def issue_github_auth(request: Request) -> Response:
 
 async def process_repo(session: AsyncSession, repository: Repository) -> None:
     try:
-        await gspread.update_repo(repository)
+        await gspread.add_repo_link(repository)
         await github.clone_repo(repository.assignment.owner, repository.assignment.repo, repository.repo_name)
 
         await github.protect_branch(repository.assignment.owner, repository.repo_name, "master")
@@ -164,6 +165,57 @@ async def sync_assignment(request: Request) -> Response:
     ...
 
 
+async def github_webhook(request: Request) -> Response:
+    session: AsyncSession = request.scope["db"]
+
+    event = request.headers.get("X-GitHub-Event")
+    if event != "pull_request_review":
+        return PlainTextResponse("Unknown event")
+
+    if not github.verify_signature(
+        await request.body(),
+        request.headers.get("X-Hub-Signature-256")
+    ):
+        return PlainTextResponse("Bad signature", status_code=403)
+
+    payload = await request.json()
+
+    try:
+        state = payload["review"]["state"]
+        owner = payload["repository"]["owner"]["login"]
+        repo_name = payload["repository"]["name"]
+        reviewer = payload["review"]["user"]["login"]
+        comment = payload["review"]["body"]
+        pr_number = payload["pull_request"]["number"]
+    except KeyError:
+        return PlainTextResponse("Invalid payload", status_code=400)
+    
+    repository = (await session.scalars(
+        select(Repository)
+        .join(Assignment, Repository.assignment_id == Assignment.id)
+        .where((Repository.repo_name == repo_name) & (Assignment.owner == owner))
+        .options(contains_eager(Repository.assignment))
+    )).one_or_none()
+
+    if repository is None:
+        return PlainTextResponse("Unknown repository")
+
+    if not github.user_in_team(owner, GITHUB_TEAM, reviewer):
+        return PlainTextResponse("Unknown reviewer")
+
+    if state != "approved":
+        return PlainTextResponse("No approval")
+
+    try:
+        bonus = int(comment)
+    except ValueError:
+        bonus = 0
+
+    await gspread.add_score(repository, bonus)
+    await github.close_pr(owner, repo_name, pr_number)
+
+    return PlainTextResponse("OK")
+
 async def password_login(request: Request) -> Response:
     form = await PasswordLoginForm.from_formdata(request)
 
@@ -203,6 +255,7 @@ def get_mount():
         path="/",
         routes=[
             Route("/password-login", password_login, methods=["GET", "POST"], name="password_login"),
+            Route("/github/webhook", github_webhook, methods=["POST"], name="github_webhook"),
             authenticated_mount,
         ],
         name="osp"
