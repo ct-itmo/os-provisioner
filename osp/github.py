@@ -144,7 +144,7 @@ async def accept_invitation(token: str, invitation_id: str) -> None:
 
 
 async def protect_branch(owner: str, repo: str, branch: str) -> None:
-    response = await api_client.patch(
+    response = await api_client.put(
         f"{BASE_URL}/repos/{owner}/{repo}/branches/{branch}/protection",
         headers={
             "Authorization": f"token {GITHUB_BOT_TOKEN}"
