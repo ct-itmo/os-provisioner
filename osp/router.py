@@ -1,5 +1,5 @@
-import datetime
 import logging
+from typing import Sequence
 
 import httpx
 from sqlalchemy import select
@@ -161,8 +161,26 @@ async def issue_assignment(request: Request) -> Response:
         raise HTTPException(500, "Произошла ошибка на стороне GitHub")
 
 
+async def sync_in_background(repositories: Sequence[Repository]) -> None:
+    for repository in repositories:
+        try:
+            await github.clone_repo(repository.assignment.owner, repository.assignment.repo, repository.repo_name)
+        except github.CloneError:
+            logger.exception("Can't clone %s", repository.repo_name)
+
+
 async def sync_assignment(request: Request) -> Response:
-    ...
+    session: AsyncSession = request.scope["db"]
+
+    repositories = (await session.scalars(
+        select(Repository).where(Repository.assignment_id == request.path_params["id"]).options(joinedload(Repository.assignment))
+    )).all()
+
+    return RedirectResponse(
+        request.url_for("osp:main"),
+        status_code=303,
+        background=BackgroundTask(sync_in_background, repositories)
+    )
 
 
 async def github_webhook(request: Request) -> Response:
@@ -216,6 +234,7 @@ async def github_webhook(request: Request) -> Response:
 
     return PlainTextResponse("OK")
 
+
 async def password_login(request: Request) -> Response:
     form = await PasswordLoginForm.from_formdata(request)
 
@@ -231,7 +250,7 @@ def get_mount():
     admin_mount = Mount(
         path="/admin",
         routes=[
-            Route("/assignment/{id}/sync", sync_assignment, methods=["POST"], name="sync")
+            Route("/assignment/{id:int}/sync", sync_assignment, methods=["POST"], name="sync")
         ],
         middleware=[
             Middleware(AdminMiddleware)

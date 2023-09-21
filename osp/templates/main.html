@@ -21,7 +21,7 @@
         <button>Создать</button>
     </form>
     {% elif repository.status.name in ["FINISHED", "FAILED"] %}
-    <form style="display: inline;" method="POST" action="{{ url_for('osp:issue_start', id=assignment.id) }}">
+    <form style="display: inline;" method="POST" action="{{ url_for('osp:issue_start', id=assignment.id) }}" onsubmit="return confirm('Вы уверены?')">
         <button>Пересоздать</button>
     </form>
     {% else %}
@@ -29,7 +29,9 @@
     {% endif %}
 
     {% if user.is_admin %}
-    <span>[ TODO: Sync ]</span>
+    <form style="display: inline;" method="POST" action="{{ url_for('osp:admin:sync', id=assignment.id) }}" onsubmit="return confirm('Вы уверены?')">
+        <button>Обновить все</button>
+    </form>
     {% else %}
     <span></span>
     {% endif %}
