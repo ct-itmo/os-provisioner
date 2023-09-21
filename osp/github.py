@@ -143,6 +143,22 @@ async def accept_invitation(token: str, invitation_id: str) -> None:
     response.raise_for_status()
 
 
+async def protect_branch(owner: str, repo: str, branch: str) -> None:
+    response = await api_client.patch(
+        f"{BASE_URL}/repos/{owner}/{repo}/branches/{branch}/protection",
+        headers={
+            "Authorization": f"token {GITHUB_BOT_TOKEN}"
+        },
+        json={
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1
+            }
+        }
+    )
+
+    response.raise_for_status()
+
+
 async def clone_repo(owner: str, source_repo: str, target_repo: str) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         process = await asyncio.create_subprocess_exec(
@@ -196,4 +212,4 @@ async def clone_repo(owner: str, source_repo: str, target_repo: str) -> None:
 __all__ = ["github_configuration", "github_client",
            "GithubError" , "RepoExistsError", "AccountRestrictedError",
            "get_user_login", "create_repository", "add_team", "add_collaborator",
-           "accept_invitation", "clone_repo"]
+           "accept_invitation", "protect_branch", "clone_repo"]

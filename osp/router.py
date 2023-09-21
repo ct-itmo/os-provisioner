@@ -124,6 +124,8 @@ async def issue_assignment(request: Request) -> Response:
 
         if invitation is not None:
             await github.accept_invitation(token, invitation["id"])
+
+        await github.protect_branch(assignment.owner, repo_name, "master")
         
         await session.execute(
             insert(Repository)
