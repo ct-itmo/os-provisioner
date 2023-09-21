@@ -156,6 +156,7 @@ async def protect_branch(owner: str, repo: str, branch: str) -> None:
             "required_status_checks": None,
             "enforce_admins": None,
             "restrictions": {
+                "users": [],
                 "teams": ["os"]
             }
         }
