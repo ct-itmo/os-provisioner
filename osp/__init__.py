@@ -6,7 +6,7 @@ from osp.router import get_mount
 
 static_path = Path(__file__).parent / "static"
 template_path = Path(__file__).parent / "templates"
-main_route = "quirck:main"
+main_route = "osp:main"
 mount = get_mount()
 shutdown = api_client.aclose
 
