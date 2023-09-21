@@ -152,6 +152,11 @@ async def protect_branch(owner: str, repo: str, branch: str) -> None:
         json={
             "required_pull_request_reviews": {
                 "required_approving_review_count": 1
+            },
+            "required_status_checks": None,
+            "enforce_admins": None,
+            "restrictions": {
+                "teams": ["os"]
             }
         }
     )
