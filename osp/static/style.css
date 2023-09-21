@@ -1,0 +1,7 @@
+.assignments {
+    display: grid;
+    grid-template-columns: max-content max-content max-content max-content;
+    grid-gap: 0.2em 2em;
+    align-items: center;
+    justify-items: center;
+}

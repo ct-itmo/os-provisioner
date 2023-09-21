@@ -1,0 +1,3 @@
+[submodule "quirck"]
+	path = quirck
+	url = https://github.com/ct-itmo/quirck.git

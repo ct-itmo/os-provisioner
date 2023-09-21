@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "osp"
+version = "0.1.0"
+description = ""
+authors = ["Nikita Sychev <root@nsychev.ru>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+quirck = {path = "quirck", develop = true}
+bcrypt = "^4.0.1"
+gspread-asyncio = "^1.9.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

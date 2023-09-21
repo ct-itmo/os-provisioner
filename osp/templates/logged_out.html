@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block main %}
+<article>
+<h1>Вы вышли</h1>
+<p>
+    <a href="{{ url_for('auth:start') }}">Войти через ИСУ</a><br/>
+    <a href="{{ url_for('osp:password_login') }}">Войти по логину и паролю</a><br/>
+</p>
+</article>
+{% endblock %}

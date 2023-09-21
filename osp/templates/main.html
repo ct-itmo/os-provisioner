@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block main %}
+<article>
+<h1>Домашние задания</h1>
+<div class="assignments">
+{% for assignment, repository in context %}
+    <span>{{ assignment.name }}</span>
+
+    {% if repository is not none and repository.status.name == "FINISHED" %}
+    <a href="https://github.com/{{ assignment.owner }}/{{ repository.repo_name}}">{{ repository.repo_name }}</a>
+    {% elif repository.status.name == "IN_PROGRESS" %}
+    <span>Создаётся</span>
+    {% elif repository.status.name == "FAILED" %}
+    <span>Ошибка</span>
+    {% else %}
+    {% endif %}
+
+    {% if repository is none %}
+    <form style="display: inline;" method="POST" action="{{ url_for('osp:issue_start', id=assignment.id) }}">
+        <button>Создать</button>
+    </form>
+    {% elif repository.status.name in ["FINISHED", "FAILED"] %}
+    <form style="display: inline;" method="POST" action="{{ url_for('osp:issue_start', id=assignment.id) }}">
+        <button>Пересоздать</button>
+    </form>
+    {% else %}
+    <span></span>
+    {% endif %}
+
+    {% if user.is_admin %}
+    <span>[ TODO: Sync ]</span>
+    {% else %}
+    <span></span>
+    {% endif %}
+{% endfor %}
+</div>
+</article>
+{% endblock %}
