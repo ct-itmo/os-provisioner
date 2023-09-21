@@ -53,7 +53,7 @@ async def get_row(worksheet: gspread_asyncio.AsyncioGspreadWorksheet, user_id: i
 async def add_repo_link(repository: Repository) -> None:
     worksheet = await get_worksheet()
 
-    row = await get_row(worksheet, repository.user.id)
+    row = await get_row(worksheet, repository.user_id)
     if row == None:
         return
 
@@ -68,7 +68,7 @@ async def add_repo_link(repository: Repository) -> None:
 async def add_score(repository: Repository, bonus: int) -> None:
     worksheet = await get_worksheet()
 
-    row = await get_row(worksheet, repository.user.id)
+    row = await get_row(worksheet, repository.user_id)
     if row == None:
         return
 
