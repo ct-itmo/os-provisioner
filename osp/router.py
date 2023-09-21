@@ -63,6 +63,8 @@ async def process_repo(session: AsyncSession, repository: Repository) -> None:
         await gspread.update_repo(repository)
         await github.clone_repo(repository.assignment.owner, repository.assignment.repo, repository.repo_name)
 
+        await github.protect_branch(repository.assignment.owner, repository.repo_name, "master")
+
         repository.status = RepoStatus.FINISHED
         await session.commit()
     except:
@@ -125,8 +127,6 @@ async def issue_assignment(request: Request) -> Response:
         if invitation is not None:
             await github.accept_invitation(token, invitation["id"])
 
-        await github.protect_branch(assignment.owner, repo_name, "master")
-        
         await session.execute(
             insert(Repository)
                 .values(
