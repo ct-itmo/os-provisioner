@@ -205,6 +205,7 @@ async def github_webhook(request: Request) -> Response:
         reviewer = payload["review"]["user"]["login"]
         comment = payload["review"]["body"]
         pr_number = payload["pull_request"]["number"]
+        pr_branch = payload["pull_request"]["head"]["ref"]
     except KeyError:
         return PlainTextResponse("Invalid payload", status_code=400)
     
@@ -231,6 +232,7 @@ async def github_webhook(request: Request) -> Response:
 
     await gspread.add_score(repository, bonus)
     await github.close_pr(owner, repo_name, pr_number)
+    await github.protect_branch(owner, repo_name, pr_branch)
 
     return PlainTextResponse("OK")
 

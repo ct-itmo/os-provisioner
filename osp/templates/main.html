@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block main %}
+<p>Вы — [{{ user.id }}] {{ user.name }}. <a href="{{ url_for('auth:logout') }}">Выйти →</a></a></p>
 <article>
 <h1>Домашние задания</h1>
 <div class="assignments">
