@@ -219,7 +219,7 @@ async def github_webhook(request: Request) -> Response:
     if repository is None:
         return PlainTextResponse("Unknown repository")
 
-    if not github.user_in_team(owner, GITHUB_TEAM, reviewer):
+    if not await github.user_in_team(owner, GITHUB_TEAM, reviewer):
         return PlainTextResponse("Unknown reviewer")
 
     if state != "approved":
