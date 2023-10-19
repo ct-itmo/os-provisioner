@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import (
-    BigInteger, Enum, String, Text,
+    BigInteger, Boolean, Enum, String, Text,
     ForeignKey, UniqueConstraint,
     text
 )
@@ -21,6 +21,7 @@ class Assignment(Base):
     repo: Mapped[str] = mapped_column(String(128), nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
     order: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    lock_after_accept: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
     repositories: Mapped[list["Repository"]] = relationship("Repository", back_populates="assignment")
 

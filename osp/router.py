@@ -231,8 +231,9 @@ async def github_webhook(request: Request) -> Response:
         bonus = 0
 
     await gspread.add_score(repository, bonus)
-    await github.close_pr(owner, repo_name, pr_number)
-    await github.protect_branch(owner, repo_name, pr_branch)
+    if repository.assignment.lock_after_accept:
+        await github.close_pr(owner, repo_name, pr_number)
+        await github.protect_branch(owner, repo_name, pr_branch)
 
     return PlainTextResponse("OK")
 
