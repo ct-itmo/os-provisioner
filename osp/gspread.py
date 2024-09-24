@@ -50,7 +50,12 @@ async def get_row(worksheet: gspread_asyncio.AsyncioGspreadWorksheet, user_id: i
         logger.info("User not found in spreadsheet: %s", user_id)
 
 
-async def add_repo_link(repository: Repository) -> None:
+async def user_exists(user_id: int) -> bool:
+    worksheet = await get_worksheet()
+    return await get_row(worksheet, user_id) is not None
+
+
+async def add_repo_link(repository: Repository, pull_id: int | None, label: str = "Repo") -> None:
     worksheet = await get_worksheet()
 
     row = await get_row(worksheet, repository.user_id)
@@ -58,7 +63,7 @@ async def add_repo_link(repository: Repository) -> None:
         return
 
     column = get_column(repository.assignment.order, Column.LINK)
-    
+
     await worksheet.update_cell(
         row, column,
         f"""=HYPERLINK("https://github.com/{repository.assignment.owner}/{repository.repo_name}/pulls"; "PR")"""
