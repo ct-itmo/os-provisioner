@@ -55,7 +55,7 @@ async def user_exists(user_id: int) -> bool:
     return await get_row(worksheet, user_id) is not None
 
 
-async def add_repo_link(repository: Repository, pull_id: int | None, label: str = "Repo") -> None:
+async def add_repo_link(repository: Repository, pull_id: int | None = None, label: str = "Repo") -> None:
     worksheet = await get_worksheet()
 
     row = await get_row(worksheet, repository.user_id)
@@ -64,9 +64,14 @@ async def add_repo_link(repository: Repository, pull_id: int | None, label: str 
 
     column = get_column(repository.assignment.order, Column.LINK)
 
+    if pull_id is None:
+        url_suffix = "pulls"
+    else:
+        url_suffix = f"pull/{pull_id}/files"
+
     await worksheet.update_cell(
         row, column,
-        f"""=HYPERLINK("https://github.com/{repository.assignment.owner}/{repository.repo_name}/pulls"; "PR")"""
+        f"""=HYPERLINK("https://github.com/{repository.assignment.owner}/{repository.repo_name}/{url_suffix}"; "{label}")"""
     )
 
 
