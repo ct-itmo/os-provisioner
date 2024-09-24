@@ -1,5 +1,5 @@
 import logging
-from typing import Sequence
+from typing import Any, Sequence
 
 import httpx
 from sqlalchemy import select
@@ -90,7 +90,7 @@ async def issue_assignment(request: Request) -> Response:
     except (OAuthException, KeyError) as exc:
         logger.info("OAuth failed: %s: %s", type(exc), exc)
         raise HTTPException(403, "Не удалось войти в GitHub")
-    
+
     try:
         login = await github.get_user_login(token)
 
@@ -150,7 +150,7 @@ async def issue_assignment(request: Request) -> Response:
                 .where((Repository.user_id == user.id) & (Repository.assignment_id == assignment.id))
                 .options(joinedload(Repository.assignment))
         )).one()
-        
+
         return RedirectResponse(
             request.url_for("osp:main"),
             status_code=303,
@@ -183,41 +183,17 @@ async def sync_assignment(request: Request) -> Response:
     )
 
 
-async def github_webhook(request: Request) -> Response:
-    session: AsyncSession = request.scope["db"]
-
-    event = request.headers.get("X-GitHub-Event")
-    if event != "pull_request_review":
-        return PlainTextResponse("Unknown event")
-
-    if not github.verify_signature(
-        await request.body(),
-        request.headers.get("X-Hub-Signature-256")
-    ):
-        return PlainTextResponse("Bad signature", status_code=403)
-
-    payload = await request.json()
-
+async def github_process_review(repository: Repository, payload: Any) -> Response:
     try:
         state = payload["review"]["state"]
-        owner = payload["repository"]["owner"]["login"]
-        repo_name = payload["repository"]["name"]
         reviewer = payload["review"]["user"]["login"]
         comment = payload["review"]["body"]
         pr_number = payload["pull_request"]["number"]
         pr_branch = payload["pull_request"]["head"]["ref"]
     except KeyError:
         return PlainTextResponse("Invalid payload", status_code=400)
-    
-    repository = (await session.scalars(
-        select(Repository)
-        .join(Assignment, Repository.assignment_id == Assignment.id)
-        .where((Repository.repo_name == repo_name) & (Assignment.owner == owner))
-        .options(contains_eager(Repository.assignment))
-    )).one_or_none()
 
-    if repository is None:
-        return PlainTextResponse("Unknown repository")
+    owner = repository.assignment.owner
 
     if not await github.user_in_team(owner, GITHUB_TEAM, reviewer):
         return PlainTextResponse("Unknown reviewer")
@@ -232,10 +208,69 @@ async def github_webhook(request: Request) -> Response:
 
     await gspread.add_score(repository, bonus)
     if repository.assignment.lock_after_accept:
-        await github.close_pr(owner, repo_name, pr_number)
-        await github.protect_branch(owner, repo_name, pr_branch)
+        await github.close_pr(owner, repository.repo_name, pr_number)
+        await github.protect_branch(owner, repository.repo_name, pr_branch)
 
     return PlainTextResponse("OK")
+
+
+async def github_process_workflow(repository: Repository, payload: Any) -> Response:
+    try:
+        action = payload["action"]
+        event = payload["workflow_run"]["event"]
+        conclusion = payload["workflow_run"]["conclusion"]
+        pr_number = payload["workflow_run"]["pull_requests"][0]["number"]
+    except (KeyError, IndexError):
+        return PlainTextResponse("Invalid payload", status_code=400)
+
+    if action != "completed" or event != "pull_request":
+        return PlainTextResponse("Run not completed")
+
+    if conclusion == "success":
+        label = f"#{pr_number} ✅"
+    else:
+        label = f"#{pr_number} ❌"
+
+    await gspread.add_repo_link(repository, pr_number, label)
+    return PlainTextResponse("OK")
+
+
+async def github_webhook(request: Request) -> Response:
+    session: AsyncSession = request.scope["db"]
+
+    if not github.verify_signature(
+        await request.body(),
+        request.headers.get("X-Hub-Signature-256")
+    ):
+        return PlainTextResponse("Bad signature", status_code=403)
+
+    payload = await request.json()
+
+    try:
+        owner = payload["repository"]["owner"]["login"]
+        repo_name = payload["repository"]["name"]
+    except KeyError:
+        return PlainTextResponse("Invalid payload", status_code=400)
+
+    repository = (await session.scalars(
+        select(Repository)
+        .join(Assignment, Repository.assignment_id == Assignment.id)
+        .where((Repository.repo_name == repo_name) & (Assignment.owner == owner))
+        .options(contains_eager(Repository.assignment))
+    )).one_or_none()
+
+    if repository is None:
+        return PlainTextResponse("Unknown repository")
+
+    event = request.headers.get("X-GitHub-Event")
+
+    match event:
+        case "pull_request_review":
+            return await github_process_review(repository, payload)
+        case "workflow_run":
+            return await github_process_workflow(repository, payload)
+        case _:
+            return PlainTextResponse("Unknown event")
 
 
 async def password_login(request: Request) -> Response:
