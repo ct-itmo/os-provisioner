@@ -7,8 +7,8 @@ authors = ["Nikita Sychev <root@nsychev.ru>"]
 [tool.poetry.dependencies]
 python = "^3.10"
 quirck = {path = "quirck", develop = true}
-bcrypt = "^4.0.1"
-gspread-asyncio = "^1.9.0"
+bcrypt = "^4.2.0"
+gspread-asyncio = "^2.0.0"
 
 
 [build-system]
