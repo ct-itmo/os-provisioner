@@ -203,7 +203,8 @@ async def github_process_review(repository: Repository, payload: Any) -> Respons
 
     try:
         bonus = int(comment)
-    except ValueError:
+    except (ValueError, TypeError) as exc:
+        # It seems some Python version introduced TypeError here. :/
         bonus = 0
 
     await gspread.add_score(repository, bonus)
